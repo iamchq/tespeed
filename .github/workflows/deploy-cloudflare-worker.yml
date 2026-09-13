@@ -18,14 +18,9 @@ jobs:
 
       - name: Setup Rust nightly
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: nightly
-          targets: wasm32-unknown-unknown
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        with:
-          node-version: 22
 
       - name: Install Cloudflare worker build tool
         run: cargo install --git https://github.com/cloudflare/workers-rs.git worker-build --locked
