@@ -1,0 +1,63 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudflare-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # worker-build 的版本，升级时只改这里
+  WORKER_BUILD_VERSION: "0.8.3"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+
+      - name: Cache Rust dependencies and target
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Optimize npm
+        uses: lowlydba/sustainable-npm@v3
+
+      - name: Cache worker-build binary
+        id: cache-worker-build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/worker-build
+          key: worker-build-${{ runner.os }}-v${{ env.WORKER_BUILD_VERSION }}
+
+      - name: Install worker-build
+        if: steps.cache-worker-build.outputs.cache-hit != 'true'
+        run: cargo install worker-build --version ${{ env.WORKER_BUILD_VERSION }} --locked
+
+      - name: Install Wrangler
+        run: npm install -g wrangler@latest
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: crates/tespeed-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
